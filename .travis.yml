@@ -1,5 +1,5 @@
 os: linux
-dist: focal
+dist: jammy
 language: minimal
 
 notifications:
@@ -12,7 +12,7 @@ jobs:
   - stage: test
     name: "conda linux"
     os: linux
-    dist: focal
+    dist: jammy
     env: TEST_PROFILE="proteus-conda"
     install:
       - git lfs pull
@@ -26,41 +26,7 @@ jobs:
       - conda info -a
       - conda env create -f environment-dev.yml
       - conda activate proteus-dev
-      - make develop-conda N=2
+      - make develop-conda
     script:
       - export MPLBACKEND="AGG"
-      - py.test -n 1 --forked -v proteus/tests --ignore proteus/tests/POD --ignore proteus/tests/solver_tests/test_nse_RANS2P_step.py
-      - py.test -n 1 --forked -v air-water-vv/Tests/1st_set
-      - py.test -n 1 --forked -v air-water-vv/Tests/2nd_set
-      - py.test -n 1 --forked -v proteus/tests/FSI
-    deploy:
-      provider: script
-      script: bash ./scripts/deploy.sh docs
-      skip_cleanup: true
-      on:
-        branch: main
-  - stage: test
-    name: "conda osx"
-    os: osx
-    osx_image: xcode13.4
-    env: TEST_PROFILE="proteus-conda-osx"
-    install:
-      - wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh;
-      - bash miniconda.sh -b -p $HOME/miniconda
-      - source "$HOME/miniconda/etc/profile.d/conda.sh"
-      - hash -r
-      - conda config --set always_yes yes --set changeps1 no
-      - conda update -q conda
-      - conda info -a
-      - conda env create -f environment-dev.yml
-      - conda activate proteus-dev
-      - pip install gmsh
-      - make develop-conda N=2
-    script:
-      - export MPLBACKEND="AGG"
-      - git lfs install
-      - git lfs pull
-      - py.test -n 1 --forked -v proteus/tests --ignore proteus/tests/solver_tests --ignore proteus/tests/POD --ignore=proteus/tests/MoveMeshMonitor --ignore proteus/tests/periodic
-      - py.test -n 1 --forked -v air-water-vv/Tests/1st_set
-      - py.test -n 1 --forked -v air-water-vv/Tests/2nd_set --ignore air-water-vv/Tests/2nd_set/test_randomWaves.py
-      - py.test -n 1 --forked -v proteus/tests/FSI
+      - py.test -n 1 --forked -v proteus/tests --ignore proteus/tests/POD

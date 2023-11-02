@@ -692,7 +692,7 @@ class PlanarStraightLineGraphDomain(D_base):
             for j in range(nVertexAttributes):
                 self.vertexAttributes[j].append(float(line[3+j]))
             if hasVertexFlag:
-                self.vertexFlags.append(line[3+nVertexAttributes])
+                self.vertexFlags.append(int(line[3+nVertexAttributes]))
         segmentLine = f.readline().split()
         while len(segmentLine) == 0 or segmentLine[0][0] == '#':
             segmentLine = f.readline().split()
@@ -725,7 +725,7 @@ class PlanarStraightLineGraphDomain(D_base):
         nRegions = int(regionLine[0])
         self.regions=[]
         self.regionFlags=[]
-        self.areaConstraints=[]
+        self.regionConstraints=[]
         for i in range(nRegions):
             line =  f.readline().split()
             while len(line) == 0 or line[0][0] == '#':
@@ -735,7 +735,7 @@ class PlanarStraightLineGraphDomain(D_base):
                 self.regionFlags.append(int(line[3]))
                 if len(line) > 4:
                     if line[4][0] != '#':
-                        self.areaConstraints.append(float(line[4]))
+                        self.regionConstraints.append(float(line[4]))
         self.getBoundingBox()
         if self.segmentFlags :
             self.getSegmentPartition()
@@ -760,7 +760,6 @@ class PlanarStraightLineGraphDomain(D_base):
             #write the vertices
             for vN,v in enumerate(self.vertices):
                 pf.write('%d %21.16e %21.16e ' % (vN+1,v[0],v[1]))
-                #import pdb; pdb.set_trace()
                 if self.vertexFlags :#write vertex flag if we have vertexFlags
                     pf.write('%d\n' % (self.vertexFlags[vN],))
                 else:
@@ -1111,7 +1110,7 @@ class PiecewiseLinearComplexDomain(D_base):
         nRegions = int(regionLine[0])
         self.regions = []
         self.regionFlags = []
-        self.areaConstraints = []
+        self.regionConstraints = []
         for i in range(nRegions):
             line =  f.readline().split()
             while len(line) == 0 or line[0][0] == '#':
@@ -1120,7 +1119,7 @@ class PiecewiseLinearComplexDomain(D_base):
             if len(line) > 4:
                 self.regionFlags.append(int(line[4]))
             if len(line) > 5:
-                self.areaConstraints.append(float(line[5]))
+                self.regionConstraints.append(float(line[5]))
         self.getBoundingBox()
         f.close()
 
@@ -1333,6 +1332,39 @@ dotfactor=12;
     def writeXdmf(self,fileprefix):
         pass
 
+class ExtrudedTriangulation(PiecewiseLinearComplexDomain):
+    def __init__(self, tri, top_z, top_f, bottom_f):
+        assert top_z > tri.nodeArray[:,2].max()
+        vertices = np.vstack([tri.nodeArray,tri.nodeArray])
+        nv_bottom = tri.nodeArray.shape[0]
+        vertices[nv_bottom:,2] = top_z
+        vertexFlags = np.hstack([tri.nodeMaterialTypes, tri.nodeMaterialTypes])
+        vertexFlags[nv_bottom:] = top_f
+        vertexFlags[np.where(vertexFlags == 0)] = bottom_f
+        facets = []
+        facetFlags = []
+        for t in tri.elementNodesArray:
+            facets.append([t.tolist()])
+            facetFlags.append(bottom_f)
+        new_triangles = tri.elementNodesArray.copy()
+        new_triangles += nv_bottom
+        for t in new_triangles:
+            facets.append([t.tolist()])
+            facetFlags.append(top_f)
+        for ebNE in range(tri.nExteriorElementBoundaries_global):
+            ebN = tri.exteriorElementBoundariesArray[ebNE]
+            eN = tri.elementBoundaryElementsArray[ebN,0]#by definition only one element on boundary
+            ebN_local = tri.elementBoundaryLocalElementBoundariesArray[ebN,0]
+            assert tri.elementBoundaryLocalElementBoundariesArray[ebN,1] == -1, ebN
+            nL = tri.elementNodesArray[eN,(ebN_local+1)%3]
+            nR = tri.elementNodesArray[eN,(ebN_local+2)%3]
+            facets.append([[nL,nR,nR+nv_bottom, nL+nv_bottom]])
+            facetFlags.append(int(tri.elementBoundaryMaterialTypes[ebN]))
+        vertices = vertices.tolist()
+        vertexFlags = [int(f) for f in vertexFlags.tolist()]        
+        PiecewiseLinearComplexDomain.__init__(self, fileprefix=None, vertices=vertices, facets=facets,
+                 facetHoles=None, holes=None, regions=None, vertexFlags=vertexFlags, facetFlags=facetFlags,
+                 regionFlags=None, regionConstraints=None, bc=None, name="extruded", units="m")
 
 
 

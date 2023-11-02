@@ -311,8 +311,9 @@ class Coefficients(proteus.TransportCoefficients.TC_base):
                  outputQuantDOFs=False,
                  #NULLSPACE INFO
                  nullSpace='NoNullSpace',
-                 initialize=True):
-
+                 initialize=True,
+                 useExact_s=False):
+        self.useExact_s = useExact_s
         self.variableNames = ['vof']
         self.LS_modelIndex = LS_model
         self.V_model = V_model
@@ -577,7 +578,8 @@ class LevelModel(proteus.Transport.OneLevelTransport):
                  sd=True,
                  movingDomain=False,
                  bdyNullSpace=False):
-
+        if coefficients.useExact_s:
+            self.hasCutCells=True
         self.auxiliaryCallCalculateResidual = False
         #
         # set the objects describing the method and boundary conditions
@@ -1001,7 +1003,8 @@ class LevelModel(proteus.Transport.OneLevelTransport):
              2: self.q[('x')][:, :, 2]}
         t = self.timeIntegration.t
         self.coefficients.q_v[..., 0] = self.velocityFieldAsFunction[0](X, t)
-        self.coefficients.q_v[..., 1] = self.velocityFieldAsFunction[1](X, t)
+        if (self.nSpace_global == 2):
+            self.coefficients.q_v[..., 1] = self.velocityFieldAsFunction[1](X, t)
         if (self.nSpace_global == 3):
             self.coefficients.q_v[..., 2] = self.velocityFieldAsFunction[2](X, t)
 
@@ -1010,7 +1013,8 @@ class LevelModel(proteus.Transport.OneLevelTransport):
                   1: self.ebqe['x'][:, :, 1],
                   2: self.ebqe['x'][:, :, 2]}
         self.coefficients.ebqe_v[..., 0] = self.velocityFieldAsFunction[0](ebqe_X, t)
-        self.coefficients.ebqe_v[..., 1] = self.velocityFieldAsFunction[1](ebqe_X, t)
+        if (self.nSpace_global == 2):
+            self.coefficients.ebqe_v[..., 1] = self.velocityFieldAsFunction[1](ebqe_X, t)
         if (self.nSpace_global == 3):
             self.coefficients.ebqe_v[..., 2] = self.velocityFieldAsFunction[2](ebqe_X, t)
             
@@ -1121,11 +1125,19 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         self.dLow.fill(0.0)
         
         r.fill(0.0)
+        try:
+            self.isActiveR[:] = 0.0
+            self.isActiveDOF[:] = 0.0
+            self.isActiveElement[:] = 0
+        except AttributeError:
+            self.isActiveR = np.zeros_like(r)
+            self.isActiveDOF = np.zeros_like(self.u[0].dof)
+            self.isActiveElement = np.zeros((self.mesh.nElements_global,),'i')
         # Load the unknowns into the finite element dof
         self.timeIntegration.calculateCoefs()
         self.timeIntegration.calculateU(u)
         self.setUnknowns(self.timeIntegration.u)
-        # cek can put in logic to skip of BC's don't depend on t or u
+        # cek can put in logic to skip if BC's don't depend on t or u
         # Dirichlet boundary conditions
         # if hasattr(self.numericalFlux,'setDirichletValues'):
         if (self.stage!=2):
@@ -1151,6 +1163,7 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["mesh_velocity_dof"] = self.mesh.nodeVelocityArray
         argsDict["MOVING_DOMAIN"] = self.MOVING_DOMAIN
         argsDict["mesh_l2g"] = self.mesh.elementNodesArray
+        argsDict["x_ref"] = self.elementQuadraturePoints
         argsDict["dV_ref"] = self.elementQuadratureWeights[('u', 0)]
         argsDict["u_trial_ref"] = self.u[0].femSpace.psi
         argsDict["u_grad_trial_ref"] = self.u[0].femSpace.grad_psi
@@ -1177,6 +1190,7 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["u_l2g"] = self.u[0].femSpace.dofMap.l2g
         argsDict["r_l2g"] = self.l2g[0]['freeGlobal']
         argsDict["elementDiameter"] = self.mesh.elementDiametersArray
+        argsDict["elementBoundaryDiameter"] = self.mesh.elementBoundaryDiametersArray
         argsDict["degree_polynomial"] = float(self.degree_polynomial)
         argsDict["u_dof"] = self.u[0].dof
         argsDict["u_dof_old"] = self.u_dof_old
@@ -1196,6 +1210,7 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["nExteriorElementBoundaries_global"] = self.mesh.nExteriorElementBoundaries_global
         argsDict["exteriorElementBoundariesArray"] = self.mesh.exteriorElementBoundariesArray
         argsDict["elementBoundaryElementsArray"] = self.mesh.elementBoundaryElementsArray
+        argsDict["elementBoundariesArray"] = self.mesh.elementBoundariesArray
         argsDict["elementBoundaryLocalElementBoundariesArray"] = self.mesh.elementBoundaryLocalElementBoundariesArray
         argsDict["ebqe_velocity_ext"] = self.coefficients.ebqe_v
         argsDict["ebqe_porosity_ext"] = self.coefficients.ebqe_porosity
@@ -1231,12 +1246,25 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["min_u_bc"] = self.min_u_bc
         argsDict["max_u_bc"] = self.max_u_bc
         argsDict["quantDOFs"] = self.quantDOFs
+        argsDict["ghost_penalty_constant"] = self.coefficients.flowCoefficients.ghost_penalty_constant
+        argsDict["phi_solid_nodes"] = self.coefficients.flowCoefficients.phi_s
+        argsDict["useExact"] = int(self.coefficients.useExact_s)
+        argsDict["isActiveR"] = self.isActiveR
+        argsDict["isActiveDOF"] = self.isActiveDOF
+        argsDict["isActiveElement"] = self.isActiveElement
+        argsDict["ebqe_phi_s"] = self.coefficients.flowCoefficients.ebqe_phi_s
+        argsDict["phi_solid"] = self.coefficients.flowCoefficients.q_phi_solid
+        argsDict["csrRowIndeces_u_u"] = self.csrRowIndeces[(0, 0)]
+        argsDict["csrColumnOffsets_u_u"] = self.csrColumnOffsets[(0, 0)]
+        argsDict["csrColumnOffsets_eb_u_u"] = self.csrColumnOffsets_eb[(0, 0)]
         self.calculateResidual(argsDict)
 
         if self.forceStrongConditions:
             for dofN, g in list(self.dirichletConditionsForceDOF.DOFBoundaryConditionsDict.items()):
                 r[dofN] = 0
-
+        if self.coefficients.STABILIZATION_TYPE <= 1:
+            r*=self.isActiveR
+            self.u[0].dof[:] = np.where(self.isActiveDOF==1.0, self.u[0].dof,1.0)
         if (self.auxiliaryCallCalculateResidual == False):
             edge_based_cflMax = globalMax(self.edge_based_cfl.max()) * self.timeIntegration.dt
             cell_based_cflMax = globalMax(self.q[('cfl', 0)].max()) * self.timeIntegration.dt
@@ -1262,6 +1290,7 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["mesh_velocity_dof"] = self.mesh.nodeVelocityArray
         argsDict["MOVING_DOMAIN"] = self.MOVING_DOMAIN
         argsDict["mesh_l2g"] = self.mesh.elementNodesArray
+        argsDict["x_ref"] = self.elementQuadraturePoints
         argsDict["dV_ref"] = self.elementQuadratureWeights[('u', 0)]
         argsDict["u_trial_ref"] = self.u[0].femSpace.psi
         argsDict["u_grad_trial_ref"] = self.u[0].femSpace.grad_psi
@@ -1285,6 +1314,7 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["u_l2g"] = self.u[0].femSpace.dofMap.l2g
         argsDict["r_l2g"] = self.l2g[0]['freeGlobal']
         argsDict["elementDiameter"] = self.mesh.elementDiametersArray
+        argsDict["elementBoundaryDiameter"] = self.mesh.elementBoundaryDiametersArray
         argsDict["u_dof"] = self.u[0].dof
         argsDict["velocity"] = self.coefficients.q_v
         argsDict["q_m_betaBDF"] = self.timeIntegration.beta_bdf[0]
@@ -1296,6 +1326,7 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["nExteriorElementBoundaries_global"] = self.mesh.nExteriorElementBoundaries_global
         argsDict["exteriorElementBoundariesArray"] = self.mesh.exteriorElementBoundariesArray
         argsDict["elementBoundaryElementsArray"] = self.mesh.elementBoundaryElementsArray
+        argsDict["elementBoundariesArray"] = self.mesh.elementBoundariesArray
         argsDict["elementBoundaryLocalElementBoundariesArray"] = self.mesh.elementBoundaryLocalElementBoundariesArray
         argsDict["ebqe_velocity_ext"] = self.coefficients.ebqe_v
         argsDict["ebqe_porosity_ext"] = self.coefficients.ebqe_porosity
@@ -1305,6 +1336,14 @@ class LevelModel(proteus.Transport.OneLevelTransport):
         argsDict["ebqe_bc_flux_u_ext"] = self.ebqe[('advectiveFlux_bc', 0)]
         argsDict["csrColumnOffsets_eb_u_u"] = self.csrColumnOffsets_eb[(0, 0)]
         argsDict["STABILIZATION_TYPE"] = self.coefficients.STABILIZATION_TYPE
+        argsDict["ghost_penalty_constant"] = self.coefficients.flowCoefficients.ghost_penalty_constant
+        argsDict["phi_solid_nodes"] = self.coefficients.flowCoefficients.phi_s
+        argsDict["useExact"] = int(self.coefficients.useExact_s)
+        argsDict["isActiveR"] = self.isActiveR
+        argsDict["isActiveDOF"] = self.isActiveDOF
+        argsDict["isActiveElement"] = self.isActiveElement
+        argsDict["ebqe_phi_s"] = self.coefficients.flowCoefficients.ebqe_phi_s
+        argsDict["phi_solid"] = self.coefficients.flowCoefficients.q_phi_solid
         self.calculateJacobian(argsDict)
 
         # Load the Dirichlet conditions directly into residual
@@ -1323,8 +1362,17 @@ class LevelModel(proteus.Transport.OneLevelTransport):
                         self.nzval[i] = 0.0
                         # print "RBLES zeroing residual cj = %s dofN= %s
                         # global_dofN= %s " % (cj,dofN,global_dofN)
+        if self.coefficients.STABILIZATION_TYPE <= 1:
+            for global_dofN_a in np.argwhere(self.isActiveR==0.0):
+                global_dofN = global_dofN_a[0]
+                for i in range(
+                        self.rowptr[global_dofN],
+                        self.rowptr[global_dofN + 1]):
+                    if (self.colind[i] == global_dofN):
+                        self.nzval[i] = 1.0
+                    else:
+                        self.nzval[i] = 0.0
         logEvent("Jacobian ", level=10, data=jacobian)
-        # mwf decide if this is reasonable for solver statistics
         self.nonlinear_function_jacobian_evaluations += 1
         return jacobian
 

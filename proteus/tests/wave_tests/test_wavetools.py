@@ -357,35 +357,36 @@ class TestWaveParameters(unittest.TestCase):
 
     def testCos2s(self):
         from proteus.WaveTools import cos2s
+        from math import cos
         f0 = random.random() + 1.
         f = np.linspace(f0/2.,2.*f0,10)
         thetas = np.linspace(-pi/2.,pi/2.,11)
-        s = 10. + 10. * np.random.random()
-        S_PM = np.zeros((len(thetas),len(f)),)
+        s = 10. + 10. * random.random()
+        S_PM = np.zeros((len(thetas),len(f)),'d')
         for ii in range(len(thetas)):
             for jj in range(len(f)):
-                S_PM[ii,jj]= np.cos(old_div(thetas[ii],2.))**(2*s)
+                S_PM[ii,jj]= cos(thetas[ii]/2.0)**(2*s)
         S_PM2 =  cos2s(thetas,f,s)
-        SCOMP = old_div(S_PM2,S_PM)
-        self.assertTrue(np.array_equal(S_PM,S_PM2))
+        SCOMP = S_PM2/S_PM
+        npt.assert_array_almost_equal(S_PM,S_PM2)
 
     def testMitsuyasu(self):
         from proteus.WaveTools import mitsuyasu
+        from math import cos
         f0 = random.random() + 1.
         f = np.linspace(f0/2.,2.*f0,10)
         thetas = np.linspace(-pi/2.,pi/2.,11)
-        s = 10 + 10. * np.random.random()
+        smax = 10 + 10. * random.random()
         ss = np.zeros(len(f),)
-        ss = (old_div(f,f0))**5
+        ss = smax*(f/f0)**5
         i = np.where(f>f0)[0][0]
-        ss[i:] = (old_div(f[i:],f0))**(-2.5)
-        ss[:] *= s
-        S_PM = np.zeros((len(thetas),len(f)),)
+        ss[i:] = smax*(f[i:]/f0)**(-2.5)
+        S_PM = np.zeros((len(thetas),len(f)),'d')
         for ii in range(len(thetas)):
             for jj in range(len(f)):
-                S_PM[ii,jj]= np.cos(old_div(thetas[ii],2.))**(2.*ss[jj])
-        S_PM2 =  mitsuyasu(thetas,f,f0,s)
-        self.assertTrue(np.array_equal(S_PM,S_PM2))
+                S_PM[ii,jj]= cos(thetas[ii]/2.)**(2*ss[jj])
+        S_PM2 =  mitsuyasu(thetas,f,f0,smax)
+        npt.assert_array_almost_equal(S_PM,S_PM2)
 
 class VerifySteadyCurrent(unittest.TestCase):
     def testCurrent(self):
@@ -630,7 +631,6 @@ class VerifyMonoChromaticFentonWaves(unittest.TestCase):
         self.assertTrue((err_y <= 1e-08))
         self.assertTrue((err_z <= 1e-08))
 
-    @pytest.mark.skipif(sys.platform == "darwin", reason="does not run on macOS")
     def testAutoFenton(self):
         waveHeight = 0.05
         depth = 0.45
@@ -1703,7 +1703,6 @@ class CheckRandomWavesFastFailureModes(unittest.TestCase):
 
 class VerifyRandomWavesFast(unittest.TestCase):
 # RandomWavesFast will be tested to the point that it gives the same answer as TimeSeriesClass
-    @pytest.mark.skipif(sys.platform == "darwin", reason="does not run on macOS")
     def testRandomFast(self):
         from proteus.WaveTools import RandomWaves,TimeSeries,RandomWavesFast
         import random
@@ -2080,7 +2079,6 @@ class VerifyRandomNLWaves(unittest.TestCase):
 
 class VerifyRandomNLWavesFast(unittest.TestCase):
 # RandomWavesFast will be tested to the point that it gives the same answer as TimeSeriesClass
-    @pytest.mark.skipif(sys.platform == "darwin", reason="does not run on macOS")
     def testRandomNLFast(self):
         from proteus.WaveTools import RandomNLWaves,RandomNLWavesFast,TimeSeries
         import random

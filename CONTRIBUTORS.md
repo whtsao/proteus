@@ -20,12 +20,14 @@
 - Copyright 2018 John Fenton johndfenton@gmail.com
 - Copyright 2018 Manuel Quezada de Luna manuel.quezada.dl@gmail.com
 - Copyright 2018 Yong Yang wacyyang@gmail.com
+- Copyright 2018 Haydel Collins haydel.collins@gmail.com
 - Copyright 2019 Greg Burgreen greg.burgreen@msstate.edu
 - Copyright 2019 Johan Mabille johan.mabille@quantstack.net
 - Copyright 2019 David Brochart david.brochart@quantstack.net
 - Copyright 2019 Martin Renou martin.renou@quantstack.net
 - Copyright 2019 Eric Tovar eric.j.tovar@usace.army.mil
 - Copyright 2022 Jan Janssen janssen@lanl.gov
+- Copyright 2023 Arnob Barua abarua@lsu.edu
 
 **Note for U.S. Federal Employees**
 

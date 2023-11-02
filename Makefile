@@ -6,13 +6,13 @@ all: develop
 #otherwise we try our best to determine them automatically.
 
 SHELL=/usr/bin/env bash
-N=1
+N ?= 1
 PROTEUS ?= $(shell python3 -c "from __future__ import print_function; import os; print(os.path.realpath(os.getcwd()))")
 VER_CMD = git log -1 --pretty="%H"
 PROTEUS_BUILD_CMD = python3 setup.py build_ext
-PROTEUS_INSTALL_CMD = pip --disable-pip-version-check install -v . #python3 setup.py install
+PROTEUS_INSTALL_CMD = pip install -v . #python3 setup.py install
 PROTEUS_DEVELOP_BUILD_CMD = python3 setup.py build_ext -i
-PROTEUS_DEVELOP_CMD = pip --disable-pip-version-check install -v -e .
+PROTEUS_DEVELOP_CMD = pip install -v -e . 
 #
 ifeq (${N}, 1)
 PROTEUS_BUILD_CMD = python3 -c "print('Letting install handle build_ext')"
@@ -124,10 +124,6 @@ stack:
 	@echo "Updating stack submodule"
 	git submodule update --init stack
 
-air-water-vv:
-	@echo "Updating air-water-vv submodule"
-	git submodule update --init air-water-vv
-
 bld_cache: stack/hit/bin/hit
 	@echo "Trying to add build cache for your arch"
 	HASHSTACK_BLD = $(shell lsb_release -ir | python3 -c "import sys; rel=dict((k.split(':')[0].split()[0],k.split(':')[1].strip().replace('.','_').lower()) for k in sys.stdin.readlines()); print('{Distributor}_{Release}'.format(**rel))")
@@ -197,7 +193,7 @@ develop: ${PROTEUS_PREFIX}/bin/proteus_env.sh stack/default.yaml ${PROTEUS_PREFI
 	@echo "Installing development version"
 	@echo "************************"
 	$(call show_info)
-	${PROTEUS_ENV} pip install py2gmsh pytest pytest-xdist pytest-cov tables future
+	${PROTEUS_ENV} pip install py2gmsh pytest pytest-xdist pytest-cov tables future hypothesis
 	${PROTEUS_ENV} ${PROTEUS_DEVELOP_BUILD_CMD}
 	${PROTEUS_ENV} ${PROTEUS_DEVELOP_CMD}
 	@echo "************************"
@@ -220,8 +216,8 @@ develop-conda:
 	@echo "Installing conda development version"
 	@echo "************************************"
 	$(call show_info)
-	${PROTEUS_DEVELOP_BUILD_CMD}
 	${PROTEUS_DEVELOP_CMD}
+	pip install pytest-xdist-forked
 	@echo "************************"
 	@echo "Development installation complete"
 	@echo "************************"
@@ -284,7 +280,7 @@ docs:
 	@echo "**********************************"
 	-sensible-browser ./docs/build/index.html &
 
-test: air-water-vv check
+test: check
 	@echo "**************************************************"
 	@echo "Running git-lfs to get regression test data files."
 	-git lfs fetch
@@ -301,14 +297,9 @@ else
 	-source ${PROTEUS_PREFIX}/bin/proteus_env.sh; MPLBACKEND=Agg py.test -n ${N} --dist=loadfile --forked -v proteus/tests -m ${TEST_MARKER} --ignore proteus/tests/POD --ignore proteus/tests/MeshAdaptPUMI --ignore=proteus/tests/solver_tests/test_nse_RANS2P_step.py --cov=proteus
 	@echo "Basic tests complete "
 	@echo "************************************"
-	@echo "Running air-water-vv test set 1"
-	-source ${PROTEUS_PREFIX}/bin/proteus_env.sh; MPLBACKEND=Agg py.test -n ${N} --dist=loadfile --forked -v air-water-vv/Tests/1st_set -m ${TEST_MARKER}
-	@echo "************************************"
-	@echo "Running air-water-vv test set 2"
-	-source ${PROTEUS_PREFIX}/bin/proteus_env.sh; MPLBACKEND=Agg py.test -n ${N} --dist=loadfile --forked -v air-water-vv/Tests/2nd_set -m ${TEST_MARKER}
 endif
 
-test-conda: air-water-vv check
+test-conda: check
 	@echo "**************************************************"
 	@echo "Running git-lfs to get regression test data files."
 	-git lfs fetch
@@ -320,11 +311,6 @@ test-conda: air-water-vv check
 	-MPLBACKEND=Agg py.test -n ${N} --dist=loadfile --forked -v proteus/tests -m ${TEST_MARKER} --ignore proteus/tests/POD --ignore proteus/tests/MeshAdaptPUMI --cov=proteus
 	@echo "Basic tests complete "
 	@echo "************************************"
-	@echo "Running air-water-vv test set 1"
-	-source ${PROTEUS_PREFIX}/bin/proteus_env.sh; MPLBACKEND=Agg py.test -n ${N} --dist=loadfile --forked -v air-water-vv/Tests/1st_set -m ${TEST_MARKER}
-	@echo "************************************"
-	@echo "Running air-water-vv test set 2"
-	-source ${PROTEUS_PREFIX}/bin/proteus_env.sh; MPLBACKEND=Agg py.test -n ${N} --dist=loadfile --forked -v air-water-vv/Tests/2nd_set -m ${TEST_MARKER}
 
 jupyter:
 	@echo "************************************"
