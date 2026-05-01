@@ -4,7 +4,7 @@ channels:
   - defaults
 dependencies:
   - compilers
-  - python
+  - python>=3.12,<3.13
   - numpy
   - setuptools
   - pip
